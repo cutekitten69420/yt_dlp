@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>yt_dlp UI</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    .row { margin-bottom: 10px; }
+    label { display:block; margin-bottom:5px }
+    input[type=text], input[type=file] { width: 100%; }
+    .small { max-width: 600px; }
+    pre { background:#f6f6f6; padding:10px; overflow:auto }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/javascript">
+    const e = React.createElement;
+
+    function App(){
+      const [mode, setMode] = React.useState('video');
+      const [bulk, setBulk] = React.useState(false);
+      const [link, setLink] = React.useState('');
+      const [outdir, setOutdir] = React.useState('');
+      const [logs, setLogs] = React.useState('');
+      const fileRef = React.useRef();
+      const cookiesRef = React.useRef();
+
+      function appendLog(text){
+        setLogs(prev => prev + text + "\n");
+      }
+
+      async function submit(e){
+        e.preventDefault();
+        setLogs('');
+        if(bulk){
+          const fd = new FormData();
+          const f = fileRef.current.files[0];
+          if(!f){ alert('Select a txt file with links'); return; }
+          fd.append('file', f);
+          const c = cookiesRef.current.files[0];
+          if(c) fd.append('cookies', c);
+          fd.append('outdir', outdir);
+          appendLog('Uploading files...');
+          const resp = await fetch('/api/download_bulk', { method: 'POST', body: fd });
+          const j = await resp.json();
+          appendLog(JSON.stringify(j, null, 2));
+          return;
+        }
+
+        if(!link){ alert('Enter a link'); return; }
+        const fd = new FormData();
+        fd.append('link', link);
+        fd.append('mode', mode);
+        fd.append('outdir', outdir);
+        appendLog('Sending request...');
+        const resp = await fetch('/api/download', { method: 'POST', body: fd });
+        const j = await resp.json();
+        appendLog(JSON.stringify(j, null, 2));
+      }
+
+      return e('div', {className:'small'},
+        e('h2', null, 'yt_dlp UI'),
+        e('form', {onSubmit: submit},
+          e('div',{className:'row'}, e('label', null, 'Single link (leave blank if using bulk):'), e('input',{type:'text', value:link, onChange: (ev)=>setLink(ev.target.value)})),
+          e('div',{className:'row'}, e('label', null, 'Mode:'), 
+            e('label', null, e('input',{type:'radio', name:'mode', checked: mode==='video', onChange: ()=>setMode('video')}), ' Video'),
+            e('label', null, e('input',{type:'radio', name:'mode', checked: mode==='audio', onChange: ()=>setMode('audio')}), ' Audio')
+          ),
+          e('div',{className:'row'}, e('label', null, e('input',{type:'checkbox', checked: bulk, onChange: (ev)=>setBulk(ev.target.checked)}), ' Bulk (upload a .txt of links)')),
+          bulk ? e('div',{className:'row'}, e('label', null, 'Links file (.txt):'), e('input',{type:'file', ref: fileRef, accept:'.txt'})) : null,
+          e('div',{className:'row'}, e('label', null, 'Cookies file (optional):'), e('input',{type:'file', ref: cookiesRef})),
+          e('div',{className:'row'}, e('label', null, 'Output folder (full path on server):'), e('input',{type:'text', value:outdir, onChange:(ev)=>setOutdir(ev.target.value)})),
+          e('div',{className:'row'}, e('button',{type:'submit'}, 'Download'))
+        ),
+        e('h3', null, 'Logs'),
+        e('pre', null, logs)
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(e(App));
+  </script>
+</body>
+</html>
